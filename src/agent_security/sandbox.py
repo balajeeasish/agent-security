@@ -8,8 +8,9 @@ long as you permit. ToolSandbox enforces all three.
 from __future__ import annotations
 
 import concurrent.futures
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlparse
 
 
@@ -23,7 +24,7 @@ class ToolSpec:
 
     name: str
     fn: Callable[..., Any]
-    validate: Callable[[Dict[str, Any]], None] | None = None
+    validate: Callable[[dict[str, Any]], None] | None = None
     description: str = ""
 
 
@@ -32,7 +33,7 @@ class ToolSandbox:
 
     def __init__(
         self,
-        tools: Iterable[ToolSpec] | Dict[str, ToolSpec],
+        tools: Iterable[ToolSpec] | dict[str, ToolSpec],
         timeout: float = 5.0,
         blocked_domains: Iterable[str] | None = None,
     ) -> None:
@@ -41,10 +42,10 @@ class ToolSandbox:
         else:
             self._tools = {t.name: t for t in tools}
         self.timeout = timeout
-        self.blocked_domains: List[str] = [d.lower() for d in (blocked_domains or [])]
+        self.blocked_domains: list[str] = [d.lower() for d in (blocked_domains or [])]
 
     @property
-    def allowed_tools(self) -> List[str]:
+    def allowed_tools(self) -> list[str]:
         return sorted(self._tools)
 
     def call(self, name: str, **kwargs: Any) -> Any:
@@ -64,7 +65,7 @@ class ToolSandbox:
                 ) from exc
         return self._run_with_timeout(spec, kwargs)
 
-    def _run_with_timeout(self, spec: ToolSpec, kwargs: Dict[str, Any]) -> Any:
+    def _run_with_timeout(self, spec: ToolSpec, kwargs: dict[str, Any]) -> Any:
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(spec.fn, **kwargs)
             try:
@@ -79,12 +80,10 @@ class ToolSandbox:
         host = (urlparse(url).hostname or "").lower()
         for domain in self.blocked_domains:
             if host == domain or host.endswith("." + domain):
-                raise ToolBlockedError(
-                    f"url '{url}' hits blocked domain '{domain}'"
-                )
+                raise ToolBlockedError(f"url '{url}' hits blocked domain '{domain}'")
 
 
-def no_parent_traversal(args: Dict[str, Any]) -> None:
+def no_parent_traversal(args: dict[str, Any]) -> None:
     """Example validator: file paths may not escape their directory."""
     path = str(args.get("path", ""))
     if ".." in path or path.startswith("/"):
