@@ -10,13 +10,13 @@ from agent_security.sandbox import ToolBlockedError, ToolSandbox, ToolSpec
 from agent_security.secrets import Finding, redact, scan
 
 __all__ = [
+    "Finding",
     "Probe",
     "ProbeRunner",
     "SecurityGateError",
     "ToolBlockedError",
     "ToolSandbox",
     "ToolSpec",
-    "Finding",
     "build_default_probes",
     "build_owasp_probes",
     "gate",
@@ -24,4 +24,4 @@ __all__ = [
     "scan",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
