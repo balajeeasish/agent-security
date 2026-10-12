@@ -7,8 +7,8 @@ category so a runner can report coverage per category.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List
 
 
 @dataclass
@@ -18,12 +18,10 @@ class Probe:
     name: str
     category: str
     payload_template: str
-    compromised: Callable[[str], bool] = field(
-        default=lambda output: False, repr=False
-    )
+    compromised: Callable[[str], bool] = field(default=lambda output: False, repr=False)
     description: str = ""
 
-    def render(self, params: Dict[str, str] | None = None) -> str:
+    def render(self, params: dict[str, str] | None = None) -> str:
         """Render the payload template with the given parameters."""
         return self.payload_template.format(**(params or {}))
 
@@ -39,7 +37,7 @@ def _executed(tool_name: str) -> Callable[[str], bool]:
     return check
 
 
-def _build_injection_probes() -> List[Probe]:
+def _build_injection_probes() -> list[Probe]:
     """The original injection pack: 15 probes across 5 categories."""
     return [
         # ---- direct_override: the attacker talks to the agent directly ----
@@ -208,7 +206,7 @@ def _build_injection_probes() -> List[Probe]:
     ]
 
 
-def build_owasp_probes() -> List[Probe]:
+def build_owasp_probes() -> list[Probe]:
     """OWASP Top 10 for Agentic Applications pack.
 
     27 probes across 6 categories covering the risks the original
@@ -525,6 +523,6 @@ def build_owasp_probes() -> List[Probe]:
     ]
 
 
-def build_default_probes() -> List[Probe]:
+def build_default_probes() -> list[Probe]:
     """Return the full built-in probe pack: 42 probes, 11 categories."""
     return _build_injection_probes() + build_owasp_probes()
