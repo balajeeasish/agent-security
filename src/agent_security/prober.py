@@ -95,3 +95,71 @@ class ProbeRunner:
             "and re-run until the report is clean.",
         ]
         return "\n".join(lines)
+
+    def json_report(self, results: Sequence[ProbeResult]) -> str:
+        """Machine-readable report: summary plus per-probe outcomes."""
+        import json
+
+        total = len(results)
+        compromised = [r for r in results if r.compromised]
+        errored = [r for r in results if r.error]
+        by_category: Dict[str, Dict[str, int]] = {}
+        for r in results:
+            bucket = by_category.setdefault(
+                r.category, {"total": 0, "compromised": 0}
+            )
+            bucket["total"] += 1
+            if r.compromised:
+                bucket["compromised"] += 1
+        return json.dumps(
+            {
+                "summary": {
+                    "total": total,
+                    "compromised": len(compromised),
+                    "passed": total - len(compromised) - len(errored),
+                    "errored": len(errored),
+                },
+                "by_category": by_category,
+                "probes": [
+                    {
+                        "name": r.probe_name,
+                        "category": r.category,
+                        "result": (
+                            "error"
+                            if r.error
+                            else "compromised"
+                            if r.compromised
+                            else "pass"
+                        ),
+                        "error": r.error,
+                    }
+                    for r in results
+                ],
+            },
+            indent=2,
+        )
+
+
+class SecurityGateError(AssertionError):
+    """Raised when a probe gate fails: too many probes compromised."""
+
+
+def gate(
+    results: Sequence[ProbeResult], max_compromised: int = 0
+) -> Sequence[ProbeResult]:
+    """Fail closed on probe results. Returns results unchanged when the
+    gate passes; raises SecurityGateError otherwise.
+
+    Use in CI: run the probes, then gate(results). Any compromise above
+    max_compromised fails the build.
+    """
+    compromised = [r.probe_name for r in results if r.compromised]
+    errored = [r.probe_name for r in results if r.error]
+    if len(compromised) > max_compromised or errored:
+        raise SecurityGateError(
+            f"security gate failed: {len(compromised)} probe(s) compromised "
+            f"({', '.join(compromised) or 'none'}), {len(errored)} errored "
+            f"({', '.join(errored) or 'none'}), "
+            f"threshold is max_compromised={max_compromised}"
+        )
+    return results

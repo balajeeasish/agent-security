@@ -47,7 +47,7 @@ print(ProbeRunner().markdown_report(results))
 From `python examples/demo.py`, first against a naive agent that echoes input and executes any tool call it sees:
 
 ```
-**30/30 probes compromised the target** (0 passed, 0 errored).
+**42/42 probes compromised the target** (0 passed, 0 errored).
 
 | Probe | Category | Result |
 | --- | --- | --- |
@@ -62,7 +62,7 @@ From `python examples/demo.py`, first against a naive agent that echoes input an
 Then the same agent wrapped in `ToolSandbox` with output redaction:
 
 ```
-**0/30 probes compromised the target** (30 passed, 0 errored).
+**0/42 probes compromised the target** (42 passed, 0 errored).
 ```
 
 The demo also shows secret scanning in action:
@@ -80,8 +80,8 @@ redacted: deploy config: aws_key=[AWS_ACCESS_KEY_REDACTED], token=[GITHUB_TOKEN_
 ```
 src/agent_security/
   probes.py    Probe dataclass (name, category, payload_template,
-               compromised(output) check); the default pack (30 probes:
-               15 injection + 15 OWASP) and the standalone OWASP pack
+               compromised(output) check); the default pack (42 probes:
+               15 injection + 27 OWASP) and the standalone OWASP pack
   prober.py    ProbeRunner: run(target_fn, probes) -> results,
                markdown_report(results) -> str
   sandbox.py   ToolSandbox: allowlisted tools, per-tool arg validators,
@@ -98,7 +98,7 @@ The design rule throughout: the target under test is just `Callable[[str], str]`
 
 ## OWASP Top 10 for Agentic Applications
 
-The probe pack maps to the [OWASP Top 10 for Agentic Applications](https://genai.owasp.org/): 30 probes across 11 categories. Use `build_owasp_probes()` for the OWASP pack alone, or `build_default_probes()` for everything.
+The probe pack maps to the [OWASP Top 10 for Agentic Applications](https://genai.owasp.org/): 42 probes across 11 categories. Use `build_owasp_probes()` for the OWASP pack alone, or `build_default_probes()` for everything.
 
 | # | OWASP risk | Covered by |
 | --- | --- | --- |
@@ -113,11 +113,25 @@ The probe pack maps to the [OWASP Top 10 for Agentic Applications](https://genai
 | 9 | Human-Agent Trust Exploitation | `multi_turn` social-engineering probes; pair with approval gates (see agent-governance) |
 | 10 | Rogue Agents | `direct_override` probes (role reassignment, instruction override) |
 
+## CI gate and JSON reports
+
+`ProbeRunner` also emits machine-readable output, and `gate()` fails closed
+for CI pipelines:
+
+```python
+from agent_security import ProbeRunner, build_default_probes, gate
+
+results = ProbeRunner().run(my_agent, build_default_probes())
+print(ProbeRunner().json_report(results))  # summary + per-probe JSON
+gate(results, max_compromised=0)           # raises SecurityGateError on breach
+```
+
+See `examples/ci_gate.py` for a drop-in CI script (exit 0 on pass, 1 on fail).
+
 ## Roadmap
 
 - Larger probe packs: multilingual injections, image and document based vectors, tool schema attacks
-- CI gate mode: fail the build when compromise count exceeds a threshold
-- Machine readable reports: JSON and SARIF output for security dashboards
+- SARIF output for security dashboards
 - Fuzzing: generated payload variations per probe for broader coverage
 - Benchmarks: probe packs versioned so teams can track security posture over time
 

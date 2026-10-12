@@ -3,7 +3,13 @@
 import base64
 import re
 
-from agent_security import ProbeRunner, build_default_probes, build_owasp_probes
+from agent_security import (
+    ProbeRunner,
+    SecurityGateError,
+    build_default_probes,
+    build_owasp_probes,
+    gate,
+)
 from agent_security.probes import Probe
 
 
@@ -32,7 +38,7 @@ def _hardened_agent(text: str) -> str:
 
 
 def test_probe_count():
-    assert len(build_default_probes()) == 30
+    assert len(build_default_probes()) == 42
 
 
 def test_probe_names_unique():
@@ -59,7 +65,7 @@ def test_all_eleven_categories_covered():
 
 def test_owasp_pack_standalone():
     owasp = build_owasp_probes()
-    assert len(owasp) == 15
+    assert len(owasp) == 27
     assert {p.category for p in owasp} == {
         "memory_poisoning",
         "inter_agent",
@@ -68,6 +74,13 @@ def test_owasp_pack_standalone():
         "privilege_abuse",
         "cascading_failure",
     }
+
+
+def test_every_owasp_category_has_at_least_four_probes():
+    counts = {}
+    for p in build_owasp_probes():
+        counts[p.category] = counts.get(p.category, 0) + 1
+    assert all(n >= 4 for n in counts.values()), counts
 
 
 def test_every_category_has_at_least_two_probes():
@@ -116,3 +129,41 @@ def test_markdown_report_marks_compromised_rows():
     report = runner.markdown_report(results)
     assert "COMPROMISED" in report
     assert "2/2 probes compromised" in report
+
+
+def test_json_report_structure():
+    import json
+
+    runner = ProbeRunner(render_params={"victim_name": "operator"})
+    results = runner.run(_naive_agent, build_default_probes()[:4])
+    parsed = json.loads(runner.json_report(results))
+    assert parsed["summary"] == {
+        "total": 4,
+        "compromised": 4,
+        "passed": 0,
+        "errored": 0,
+    }
+    assert len(parsed["probes"]) == 4
+    assert all(p["result"] == "compromised" for p in parsed["probes"])
+    assert parsed["by_category"]
+
+
+def test_gate_fails_on_compromise():
+    import pytest
+
+    runner = ProbeRunner(render_params={"victim_name": "operator"})
+    results = runner.run(_naive_agent, build_default_probes()[:3])
+    with pytest.raises(SecurityGateError):
+        gate(results, max_compromised=0)
+
+
+def test_gate_passes_for_hardened_agent():
+    runner = ProbeRunner(render_params={"victim_name": "operator"})
+    results = runner.run(_hardened_agent, build_default_probes())
+    assert gate(results, max_compromised=0) == results
+
+
+def test_gate_threshold_allows_limited_compromise():
+    runner = ProbeRunner(render_params={"victim_name": "operator"})
+    results = runner.run(_naive_agent, build_default_probes()[:3])
+    assert gate(results, max_compromised=3) == results
