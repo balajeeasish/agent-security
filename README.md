@@ -47,7 +47,7 @@ print(ProbeRunner().markdown_report(results))
 From `python examples/demo.py`, first against a naive agent that echoes input and executes any tool call it sees:
 
 ```
-**15/15 probes compromised the target** (0 passed, 0 errored).
+**30/30 probes compromised the target** (0 passed, 0 errored).
 
 | Probe | Category | Result |
 | --- | --- | --- |
@@ -62,7 +62,7 @@ From `python examples/demo.py`, first against a naive agent that echoes input an
 Then the same agent wrapped in `ToolSandbox` with output redaction:
 
 ```
-**0/15 probes compromised the target** (15 passed, 0 errored).
+**0/30 probes compromised the target** (30 passed, 0 errored).
 ```
 
 The demo also shows secret scanning in action:
@@ -80,7 +80,8 @@ redacted: deploy config: aws_key=[AWS_ACCESS_KEY_REDACTED], token=[GITHUB_TOKEN_
 ```
 src/agent_security/
   probes.py    Probe dataclass (name, category, payload_template,
-               compromised(output) check) and the 15-probe default pack
+               compromised(output) check); the default pack (30 probes:
+               15 injection + 15 OWASP) and the standalone OWASP pack
   prober.py    ProbeRunner: run(target_fn, probes) -> results,
                markdown_report(results) -> str
   sandbox.py   ToolSandbox: allowlisted tools, per-tool arg validators,
@@ -94,6 +95,23 @@ tests/         Real assertions for probes, sandbox, and secrets
 ```
 
 The design rule throughout: the target under test is just `Callable[[str], str]`. No framework lock-in, so the same probes work against a raw model call or a full agent loop.
+
+## OWASP Top 10 for Agentic Applications
+
+The probe pack maps to the [OWASP Top 10 for Agentic Applications](https://genai.owasp.org/): 30 probes across 11 categories. Use `build_owasp_probes()` for the OWASP pack alone, or `build_default_probes()` for everything.
+
+| # | OWASP risk | Covered by |
+| --- | --- | --- |
+| 1 | Agent Goal Hijack | `goal_hijack` probes (mission creep, fake admin override) |
+| 2 | Tool Misuse & Exploitation | `ToolSandbox`: allowlists, arg validators, timeouts, blocked domains |
+| 3 | Identity & Privilege Abuse | `privilege_abuse` probes (role-boundary and scope-creep asks) |
+| 4 | Agentic Supply Chain Vulnerabilities | `supply_chain` probes (poisoned tool descriptions, trojan plugins, tainted docs) |
+| 5 | Unexpected Code Execution | `direct_override` probes + sandbox blocks destructive commands |
+| 6 | Memory & Context Poisoning | `memory_poisoning` probes (poisoned recall, RAG docs, stale instructions) |
+| 7 | Insecure Inter-Agent Communication | `inter_agent` probes (peer requests, spoofed broadcasts, smuggled sub-agent steps) |
+| 8 | Cascading Failures | `cascading_failure` probes (unverified values and silent failures propagating) |
+| 9 | Human-Agent Trust Exploitation | `multi_turn` social-engineering probes; pair with approval gates (see agent-governance) |
+| 10 | Rogue Agents | `direct_override` probes (role reassignment, instruction override) |
 
 ## Roadmap
 

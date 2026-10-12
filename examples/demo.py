@@ -1,4 +1,4 @@
-"""Demo: 15 injection probes vs a naive agent, then vs a hardened one.
+"""Demo: probe pack vs a naive agent, then vs a hardened one.
 
 Run from the repo root:
 
@@ -84,7 +84,7 @@ def main() -> None:
     runner = ProbeRunner(render_params={"victim_name": "operator"})
 
     print("=" * 64)
-    print("PHASE 1: naive agent vs 15 injection probes")
+    print(f"PHASE 1: naive agent vs {len(probes)} probes")
     print("=" * 64)
     print(runner.markdown_report(runner.run(naive_agent, probes)))
 

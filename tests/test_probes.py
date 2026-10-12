@@ -3,7 +3,7 @@
 import base64
 import re
 
-from agent_security import ProbeRunner, build_default_probes
+from agent_security import ProbeRunner, build_default_probes, build_owasp_probes
 from agent_security.probes import Probe
 
 
@@ -32,7 +32,7 @@ def _hardened_agent(text: str) -> str:
 
 
 def test_probe_count():
-    assert len(build_default_probes()) == 15
+    assert len(build_default_probes()) == 30
 
 
 def test_probe_names_unique():
@@ -40,7 +40,7 @@ def test_probe_names_unique():
     assert len(names) == len(set(names))
 
 
-def test_all_five_categories_covered():
+def test_all_eleven_categories_covered():
     categories = {p.category for p in build_default_probes()}
     assert categories == {
         "direct_override",
@@ -48,6 +48,25 @@ def test_all_five_categories_covered():
         "indirect_webpage",
         "encoding_tricks",
         "multi_turn",
+        "memory_poisoning",
+        "inter_agent",
+        "supply_chain",
+        "goal_hijack",
+        "privilege_abuse",
+        "cascading_failure",
+    }
+
+
+def test_owasp_pack_standalone():
+    owasp = build_owasp_probes()
+    assert len(owasp) == 15
+    assert {p.category for p in owasp} == {
+        "memory_poisoning",
+        "inter_agent",
+        "supply_chain",
+        "goal_hijack",
+        "privilege_abuse",
+        "cascading_failure",
     }
 
 
