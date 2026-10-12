@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from agent_security import (  # noqa: E402
+from agent_security import (
     ProbeRunner,
     SecurityGateError,
     ToolBlockedError,
