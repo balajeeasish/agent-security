@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import List, Tuple
 
 # kind, compiled pattern, redaction placeholder. Order matters: earlier
 # patterns win when two patterns overlap the same span.
-PATTERNS: List[Tuple[str, "re.Pattern[str]", str]] = [
+PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     (
         "aws_access_key",
         re.compile(r"AKIA[0-9A-Z]{16}"),
@@ -67,14 +66,14 @@ def _preview(match: str) -> str:
     return "*" * len(match)
 
 
-def _overlaps(start: int, end: int, spans: List[Tuple[int, int]]) -> bool:
+def _overlaps(start: int, end: int, spans: list[tuple[int, int]]) -> bool:
     return any(start < s_end and end > s_start for s_start, s_end in spans)
 
 
-def scan(text: str) -> List[Finding]:
+def scan(text: str) -> list[Finding]:
     """Find secrets in text. Returns findings ordered by position."""
-    findings: List[Finding] = []
-    claimed: List[Tuple[int, int]] = []
+    findings: list[Finding] = []
+    claimed: list[tuple[int, int]] = []
     for kind, pattern, _placeholder in PATTERNS:
         for m in pattern.finditer(text):
             start, end = m.span()
