@@ -65,9 +65,7 @@ def test_finding_preview_does_not_contain_full_secret():
 
 
 def test_redact_replaces_all_secrets():
-    text = (
-        "aws AKIAIOSFODNN7EXAMPLE and github " + "ghp_" + "a" * 36
-    )
+    text = "aws AKIAIOSFODNN7EXAMPLE and github " + "ghp_" + "a" * 36
     redacted = redact(text)
     assert "AKIAIOSFODNN7EXAMPLE" not in redacted
     assert "ghp_" not in redacted
