@@ -123,6 +123,7 @@ from agent_security import ProbeRunner, build_default_probes, gate
 
 results = ProbeRunner().run(my_agent, build_default_probes())
 print(ProbeRunner().json_report(results))  # summary + per-probe JSON
+print(ProbeRunner().sarif_report(results)) # SARIF 2.1.0 for code scanning
 gate(results, max_compromised=0)           # raises SecurityGateError on breach
 ```
 
