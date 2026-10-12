@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 
 from agent_security.probes import Probe
 
@@ -33,15 +33,15 @@ class ProbeRunner:
     full multi-tool loop.
     """
 
-    def __init__(self, render_params: Dict[str, str] | None = None) -> None:
+    def __init__(self, render_params: dict[str, str] | None = None) -> None:
         self.render_params = render_params or {}
 
     def run(
         self,
         target_fn: Callable[[str], str],
         probes: Sequence[Probe],
-    ) -> List[ProbeResult]:
-        results: List[ProbeResult] = []
+    ) -> list[ProbeResult]:
+        results: list[ProbeResult] = []
         for probe in probes:
             payload = probe.render(self.render_params)
             try:
@@ -74,8 +74,10 @@ class ProbeRunner:
         lines = [
             "# Probe Report",
             "",
-            f"**{compromised}/{total} probes compromised the target** "
-            f"({passed} passed, {errored} errored).",
+            (
+                f"**{compromised}/{total} probes compromised the target** "
+                f"({passed} passed, {errored} errored)."
+            ),
             "",
             "| Probe | Category | Result |",
             "| --- | --- | --- |",
@@ -90,9 +92,11 @@ class ProbeRunner:
             lines.append(f"| {r.probe_name} | {r.category} | {status} |")
         lines += [
             "",
-            "A COMPROMISED row means the injected instruction was followed. "
-            "Fix the agent (sandbox tools, validate inputs, redact outputs) "
-            "and re-run until the report is clean.",
+            (
+                "A COMPROMISED row means the injected instruction was followed. "
+                "Fix the agent (sandbox tools, validate inputs, redact outputs) "
+                "and re-run until the report is clean."
+            ),
         ]
         return "\n".join(lines)
 
@@ -103,11 +107,9 @@ class ProbeRunner:
         total = len(results)
         compromised = [r for r in results if r.compromised]
         errored = [r for r in results if r.error]
-        by_category: Dict[str, Dict[str, int]] = {}
+        by_category: dict[str, dict[str, int]] = {}
         for r in results:
-            bucket = by_category.setdefault(
-                r.category, {"total": 0, "compromised": 0}
-            )
+            bucket = by_category.setdefault(r.category, {"total": 0, "compromised": 0})
             bucket["total"] += 1
             if r.compromised:
                 bucket["compromised"] += 1
@@ -134,6 +136,77 @@ class ProbeRunner:
                         "error": r.error,
                     }
                     for r in results
+                ],
+            },
+            indent=2,
+        )
+
+    def sarif_report(self, results: Sequence[ProbeResult]) -> str:
+        """SARIF 2.1.0 report: compromised probes as results.
+
+        Upload to GitHub code scanning or any SARIF consumer to track
+        agent security posture alongside other findings.
+        """
+        import json
+
+        from agent_security import __version__
+
+        rules = []
+        seen = set()
+        for r in results:
+            if r.probe_name in seen:
+                continue
+            seen.add(r.probe_name)
+            rules.append(
+                {
+                    "id": r.probe_name,
+                    "name": r.probe_name.replace("_", " ").title(),
+                    "shortDescription": {
+                        "text": f"Agent was compromised by the "
+                        f"'{r.probe_name}' probe "
+                        f"(category: {r.category})."
+                    },
+                    "helpUri": "https://github.com/balajeeasish/agent-security",
+                }
+            )
+        sarif_results = []
+        for r in results:
+            if r.error:
+                sarif_results.append(
+                    {
+                        "ruleId": r.probe_name,
+                        "level": "error",
+                        "message": {"text": f"Probe errored: {r.error}"},
+                    }
+                )
+            elif r.compromised:
+                sarif_results.append(
+                    {
+                        "ruleId": r.probe_name,
+                        "level": "error",
+                        "message": {
+                            "text": f"Agent followed the injected "
+                            f"instruction in probe '{r.probe_name}' "
+                            f"(category: {r.category})."
+                        },
+                    }
+                )
+        return json.dumps(
+            {
+                "version": "2.1.0",
+                "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+                "runs": [
+                    {
+                        "tool": {
+                            "driver": {
+                                "name": "agent-security",
+                                "version": __version__,
+                                "informationUri": "https://github.com/balajeeasish/agent-security",
+                                "rules": rules,
+                            }
+                        },
+                        "results": sarif_results,
+                    }
                 ],
             },
             indent=2,
