@@ -3,6 +3,8 @@
 import base64
 import re
 
+import pytest
+
 from agent_security import (
     ProbeRunner,
     SecurityGateError,
@@ -21,7 +23,7 @@ def _naive_agent(text: str) -> str:
         try:
             decoded = base64.b64decode(token).decode("utf-8", errors="strict")
             haystack += " " + decoded
-        except Exception:
+        except Exception:  # noqa: BLE001, S112 - token may not be valid base64; skip it
             continue
     match = re.search(r"TOOLCALL:([a-z_]+)", haystack)
     if match:
@@ -91,9 +93,7 @@ def test_every_category_has_at_least_two_probes():
 
 
 def test_template_probe_renders_params():
-    probe = next(
-        p for p in build_default_probes() if p.name == "template_rendering"
-    )
+    probe = next(p for p in build_default_probes() if p.name == "template_rendering")
     rendered = probe.render({"victim_name": "operator"})
     assert "{victim_name}" not in rendered
     assert "operator" in rendered
@@ -167,3 +167,48 @@ def test_gate_threshold_allows_limited_compromise():
     runner = ProbeRunner(render_params={"victim_name": "operator"})
     results = runner.run(_naive_agent, build_default_probes()[:3])
     assert gate(results, max_compromised=3) == results
+
+
+def test_sarif_report_structure():
+    import json
+
+    runner = ProbeRunner(render_params={"victim_name": "operator"})
+    results = runner.run(_naive_agent, build_default_probes()[:4])
+    sarif = json.loads(runner.sarif_report(results))
+    assert sarif["version"] == "2.1.0"
+    run = sarif["runs"][0]
+    assert run["tool"]["driver"]["name"] == "agent-security"
+    assert len(run["results"]) == 4
+    assert all(r["level"] == "error" for r in run["results"])
+    rule_ids = {rule["id"] for rule in run["tool"]["driver"]["rules"]}
+    assert {r["ruleId"] for r in run["results"]} <= rule_ids
+
+
+def test_sarif_clean_for_hardened_agent():
+    import json
+
+    runner = ProbeRunner(render_params={"victim_name": "operator"})
+    results = runner.run(_hardened_agent, build_default_probes()[:4])
+    sarif = json.loads(runner.sarif_report(results))
+    assert sarif["runs"][0]["results"] == []
+
+
+def test_reports_include_errored_probes():
+    import json
+
+    from agent_security.probes import Probe
+
+    def broken(_payload: str) -> str:
+        raise RuntimeError("boom")
+
+    (result,) = ProbeRunner().run(
+        broken, [Probe(name="x", category="y", payload_template="hi")]
+    )
+    runner = ProbeRunner()
+    assert "ERROR" in runner.markdown_report([result])
+    parsed = json.loads(runner.json_report([result]))
+    assert parsed["summary"]["errored"] == 1
+    sarif = json.loads(runner.sarif_report([result]))
+    assert sarif["runs"][0]["results"][0]["message"]["text"].startswith("Probe errored")
+    with pytest.raises(SecurityGateError):
+        gate([result])
