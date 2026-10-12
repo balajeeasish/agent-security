@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from agent_security import (  # noqa: E402
+from agent_security import (
     ProbeRunner,
     ToolBlockedError,
     ToolSandbox,
@@ -21,7 +21,7 @@ from agent_security import (  # noqa: E402
     redact,
     scan,
 )
-from agent_security.sandbox import no_parent_traversal  # noqa: E402
+from agent_security.sandbox import no_parent_traversal
 
 
 def _extract_toolcall(text: str, decode_blobs: bool) -> str | None:
@@ -31,7 +31,7 @@ def _extract_toolcall(text: str, decode_blobs: bool) -> str | None:
         for token in re.findall(r"[A-Za-z0-9+/=]{20,}", text):
             try:
                 decoded = base64.b64decode(token).decode("utf-8", errors="strict")
-            except Exception:
+            except Exception:  # noqa: BLE001, S112 - token may not be valid base64; skip it
                 continue
             haystack += " " + decoded
     match = re.search(r"TOOLCALL:([a-z_]+)", haystack)
